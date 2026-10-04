@@ -47,7 +47,7 @@
     .slide-body { font-size: 1.1rem; color: var(--text); margin-bottom: 20px; }
     .slide-controls { display: flex; justify-content: space-between; align-items: center; }
     .btn {
-      padding: 8px 18px; background: var(--accent); color: #000; border: none; border-radius: 6px;
+      padding: 10px 22px; background: var(--accent); color: #000; border: none; border-radius: 8px;
       font-weight: bold; cursor: pointer; transition: 0.2s;
     }
     .btn:hover { background: var(--accent-hover); }
@@ -67,10 +67,10 @@
     /* باکس هوش مصنوعی */
     .ai-wrapper { margin-top: 30px; background: var(--card-bg); border: 1px solid var(--accent); border-radius: 12px; padding: 20px; }
     .ai-title { display: flex; align-items: center; gap: 8px; color: var(--accent); margin-bottom: 12px; }
-    .ai-input-group { display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px; }
-    input[type="text"], input[type="password"] {
-      width: 100%; padding: 10px; background: #0b0f19; border: 1px solid var(--border);
-      color: var(--text); border-radius: 6px; font-size: 0.95rem; outline: none;
+    .ai-input-group { display: flex; gap: 10px; margin-bottom: 10px; }
+    input[type="text"] {
+      flex: 1; padding: 12px; background: #0b0f19; border: 1px solid var(--border);
+      color: var(--text); border-radius: 8px; font-size: 0.95rem; outline: none;
     }
     .ai-answer {
       background: #0b0f19; border: 1px solid var(--border); border-radius: 8px; padding: 15px;
@@ -121,24 +121,20 @@
     <div id="quizFeedback" style="margin-top: 15px; font-weight: bold;"></div>
   </div>
 
-  <!-- پنل گفت‌وگو با هوش مصنوعی -->
+  <!-- پنل دستیار هوش مصنوعی بدون نیاز به کلید -->
   <div class="ai-wrapper">
     <div class="ai-title">
-      <h3>🤖 دستیار صوتی و علمی جمنای (علوم هشتم)</h3>
+      <h3>🤖 دستیار علمی جمنای (پاسخ به سوالات درسی)</h3>
     </div>
     <div class="ai-input-group">
-      <input type="password" id="geminiApiKey" placeholder="کلید API جمنای را وارد کنید (AIzaSy...)" />
-      <div style="display: flex; gap: 8px;">
-        <input type="text" id="aiQuery" placeholder="مثلاً: قانون اهم را با یک مثال ملموس توضیح بده..." style="flex: 1;" />
-        <button class="btn" onclick="askAi()">ارسال پرسش</button>
-      </div>
+      <input type="text" id="aiQuery" placeholder="سوال خود را بپرسید (مثلاً: تفاوت مخلوط همگن و ناهمگن چیست؟)..." onkeydown="if(event.key==='Enter') askAi()" />
+      <button class="btn" id="askBtn" onclick="askAi()">ارسال پرسش</button>
     </div>
     <div id="aiResponse" class="ai-answer"></div>
   </div>
 </div>
 
 <script>
-  // آدرس ورکر اختصاصی کلودفلر شما
   const WORKER_URL = "https://weathered-brook-e9b3.fvgbhj.workers.dev";
 
   const lessons = [
@@ -162,7 +158,6 @@
   let currentLessonIndex = 0;
   let currentSlideIndex = 0;
 
-  // مقداردهی اولیه فهرست فصل‌ها
   const select = document.getElementById("chapterSelect");
   lessons.forEach((l, idx) => {
     const opt = document.createElement("option");
@@ -176,10 +171,8 @@
     currentSlideIndex = 0;
     renderSlide();
 
-    // خلاصه درس
     document.getElementById("notesContent").innerHTML = `<h3>${lesson.title}</h3><p style="margin-top:10px;">${lesson.notes}</p>`;
 
-    // کوییز
     document.getElementById("quizQuestion").textContent = lesson.quiz.q;
     const optsBox = document.getElementById("quizOptions");
     optsBox.innerHTML = "";
@@ -253,34 +246,23 @@
     }
   }
 
-  // ذخیره کلید در مرورگر
-  const apiKeyInput = document.getElementById("geminiApiKey");
-  apiKeyInput.value = localStorage.getItem("user_gemini_key") || "";
-  apiKeyInput.addEventListener("change", () => {
-    localStorage.setItem("user_gemini_key", apiKeyInput.value.trim());
-  });
-
-  // ارتباط با هوش مصنوعی از طریق Cloudflare Worker
   async function askAi() {
-    const apiKey = apiKeyInput.value.trim();
-    const prompt = document.getElementById("aiQuery").value.trim();
+    const promptInput = document.getElementById("aiQuery");
+    const prompt = promptInput.value.trim();
     const resBox = document.getElementById("aiResponse");
+    const askBtn = document.getElementById("askBtn");
 
-    if (!apiKey) {
-      alert("لطفاً ابتدا کلید اختصاصی جمنای را وارد کنید.");
-      return;
-    }
     if (!prompt) return;
 
     resBox.style.display = "block";
-    resBox.textContent = "⏳ در حال دریافت پاسخ از جمنای بدون فیلترشکن...";
+    resBox.textContent = "⏳ معلم هوشمند در حال بررسی پرسش شماست...";
+    askBtn.disabled = true;
 
     try {
       const response = await fetch(WORKER_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          apiKey: apiKey,
           prompt: prompt,
           lessonTitle: lessons[currentLessonIndex].title
         })
@@ -290,14 +272,15 @@
       if (data.candidates && data.candidates[0].content.parts[0].text) {
         resBox.textContent = data.candidates[0].content.parts[0].text;
       } else {
-        resBox.textContent = "خطا در دریافت پاسخ: " + JSON.stringify(data);
+        resBox.textContent = "خطا در دریافت پاسخ: " + (data.error?.message || JSON.stringify(data));
       }
     } catch (err) {
-      resBox.textContent = "خطا در اتصال: " + err.message;
+      resBox.textContent = "خطا در اتصال به سرور: " + err.message;
+    } finally {
+      askBtn.disabled = false;
     }
   }
 
-  // لود اولیه درس اول
   renderLesson();
 </script>
 </body>
